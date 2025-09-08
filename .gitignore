@@ -1,0 +1,8 @@
+# Node modules
+node_modules/
+
+# Build output
+out/
+
+# Token and credentials
+src/my_oauth_creds.json
