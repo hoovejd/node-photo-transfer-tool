@@ -6,3 +6,4 @@ out/
 
 # Token and credentials
 src/my_oauth_creds.json
+token.json

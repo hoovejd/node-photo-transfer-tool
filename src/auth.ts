@@ -12,6 +12,7 @@ const SCOPES = [
 
 const TOKEN_PATH = join(process.cwd(), "token.json");
 
+// create an oAuth client to authorize the API call
 export const getOAuth2Client = (): OAuth2Client => {
   console.log('getting oauth client...')
   return new OAuth2Client({
@@ -36,6 +37,7 @@ export const authorize = async (): Promise<OAuth2Client> => {
 };
 
 const getNewToken = async (oAuth2Client: OAuth2Client): Promise<OAuth2Client> => {
+  // Generate the url that will be used for the consent dialog.
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: "offline", // Request a refresh token
     scope: SCOPES,
@@ -62,6 +64,7 @@ const getNewToken = async (oAuth2Client: OAuth2Client): Promise<OAuth2Client> =>
       const { tokens } = await oAuth2Client.getToken(code);
       oAuth2Client.setCredentials(tokens);
 
+      // Store the token to disk for later program executions
       writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
       res.send("Authorization successful! You can close this window.");
       server.destroy();

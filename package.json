@@ -1,13 +1,15 @@
 {
   "scripts": {
-    "start": "ts-node src/index.ts"
+    "start": "ts-node src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/server-destroy": "^1.0.4",
     "typescript": "^5.9.2"
   },
   "dependencies": {
     "google-auth-library": "^10.3.0",
-    "googleapis": "^157.0.0"
+    "open": "^10.2.0",
+    "server-destroy": "^1.0.1"
   }
 }
