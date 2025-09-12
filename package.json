@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "start": "ts-node src/main.ts"
+    "start": "ts-node src/main.ts",
+    "clean": "rm -f token.json"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
