@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "fs";
-import { OAuth2Client } from "google-auth-library";
+import { OAuth2Client, TokenInfo } from "google-auth-library";
 import http from "http";
 import open from "open";
 import { join } from "path";
@@ -33,9 +33,15 @@ export function getAuthenticatedClient(): Promise<OAuth2Client> {
     });
 
     try {
-      const token = JSON.parse(readFileSync(TOKEN_PATH, "utf8"));
+      const creds: TokenInfo = JSON.parse(readFileSync(TOKEN_PATH, "utf8"));
       console.log(`reusing existing token from ${TOKEN_PATH}`);
-      oAuth2Client.setCredentials(token);
+      const expires: Date = new Date(creds.expiry_date as number);
+      console.log(`Token expires on ${expires.toLocaleString()}`);
+      if (expires.valueOf() < new Date().valueOf()) {
+        console.log("Token expired, need to re-authenticate");
+        throw new Error("Token expired");
+      }
+      oAuth2Client.setCredentials(creds);
       resolve(oAuth2Client);
       return;
     } catch (err) {
@@ -51,6 +57,7 @@ export function getAuthenticatedClient(): Promise<OAuth2Client> {
     // Open an http server to accept the oauth callback.
     const server = http
       .createServer(async (req, res) => {
+        console.log(`Received request: ${req.url}`);
         try {
           if (req.url && req.url.indexOf("/oauth2callback") > -1) {
             // acquire the code from the querystring, and close the web server.
