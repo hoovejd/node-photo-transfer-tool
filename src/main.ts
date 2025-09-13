@@ -7,7 +7,9 @@ async function main() {
   //fetchPersonInfo(oAuth2Client);
   //displayTokenInfo(oAuth2Client);
   //listAlbums(oAuth2Client);
-  uploadImage(oAuth2Client);
+  //uploadImage(oAuth2Client);
+  const albumId = await createAlbum(oAuth2Client, "Another New Album from API");
+  console.log(`Created album with ID ${albumId}`)
 }
 
 async function displayTokenInfo(oAuth2Client: OAuth2Client) {
@@ -79,6 +81,28 @@ async function uploadImage(oAuth2Client: OAuth2Client) {
 
   const createResult = await createResponse.json();
   console.log("Create response:", JSON.stringify(createResult, null, 2));
+}
+
+async function createAlbum(oAuth2Client: OAuth2Client, title: string): Promise<string> {
+  const accessToken = oAuth2Client.credentials.access_token;
+  const body = {
+    album: {
+      title: title
+    }
+  };
+
+  const response = await fetch("https://photoslibrary.googleapis.com/v1/albums", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  const json = await response.json();
+  console.log("Created album:", JSON.stringify(json, null, 2));
+  return json.id;
 }
 
 main().catch(console.error); 
