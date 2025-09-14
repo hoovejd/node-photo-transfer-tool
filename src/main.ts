@@ -1,6 +1,8 @@
-import { OAuth2Client, TokenInfo } from 'google-auth-library';
-import { getAuthenticatedClient } from './auth';
-import { readFileSync } from 'fs';
+import { OAuth2Client, TokenInfo } from "google-auth-library";
+import { getAuthenticatedClient } from "./auth";
+import { fstat, readdirSync, readFileSync, Stats, statSync } from "fs";
+import path from "path";
+import { log } from "console";
 
 async function main() {
   const oAuth2Client: OAuth2Client = await getAuthenticatedClient();
@@ -8,8 +10,9 @@ async function main() {
   //displayTokenInfo(oAuth2Client);
   //listAlbums(oAuth2Client);
   //uploadImage(oAuth2Client);
-  const albumId = await createAlbum(oAuth2Client, "Another New Album from API");
-  console.log(`Created album with ID ${albumId}`)
+  // const albumId = await createAlbum(oAuth2Client, "Another New Album from API");
+  // console.log(`Created album with ID ${albumId}`)
+  uploadAllPhotos(oAuth2Client, "/home/hoovejd/pictures");
 }
 
 async function displayTokenInfo(oAuth2Client: OAuth2Client) {
@@ -17,7 +20,6 @@ async function displayTokenInfo(oAuth2Client: OAuth2Client) {
   const tokenInfo: TokenInfo = await oAuth2Client.getTokenInfo(oAuth2Client.credentials.access_token as string);
   console.log(`Token expires on ${new Date(tokenInfo.expiry_date).toLocaleString()}`);
 }
-
 
 // Make a simple request to the People API using our pre-authenticated client.
 async function fetchPersonInfo(oAuth2Client: OAuth2Client) {
@@ -38,20 +40,19 @@ function listAlbums(oAuth2Client: OAuth2Client) {
   });
 }
 
-
 async function uploadImage(oAuth2Client: OAuth2Client) {
   const accessToken = oAuth2Client.credentials.access_token;
-  const imageBuffer = readFileSync('src/kitty.jpeg');
+  const imageBuffer = readFileSync("src/kitty.jpeg");
 
   const uploadResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       "Content-type": "application/octet-stream",
       "X-Goog-Upload-Content-Type": "image/jpeg",
-      "X-Goog-Upload-Protocol": "raw"
+      "X-Goog-Upload-Protocol": "raw",
     },
-    body: imageBuffer
+    body: imageBuffer,
   });
 
   const uploadToken = await uploadResponse.text();
@@ -64,19 +65,19 @@ async function uploadImage(oAuth2Client: OAuth2Client) {
         description: "Uploaded via API",
         simpleMediaItem: {
           fileName: "kitty.jpeg",
-          uploadToken: uploadToken
-        }
-      }
-    ]
+          uploadToken: uploadToken,
+        },
+      },
+    ],
   };
 
   const createResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
   const createResult = await createResponse.json();
@@ -87,17 +88,17 @@ async function createAlbum(oAuth2Client: OAuth2Client, title: string): Promise<s
   const accessToken = oAuth2Client.credentials.access_token;
   const body = {
     album: {
-      title: title
-    }
+      title: title,
+    },
   };
 
   const response = await fetch("https://photoslibrary.googleapis.com/v1/albums", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
   const json = await response.json();
@@ -105,4 +106,35 @@ async function createAlbum(oAuth2Client: OAuth2Client, title: string): Promise<s
   return json.id;
 }
 
-main().catch(console.error); 
+async function uploadAllPhotos(oAuth2Client: OAuth2Client, rootPhotoDir: string) {
+  const rootObjectPaths: string[] = readdirSync(rootPhotoDir);
+  for (const objectPath of rootObjectPaths) {
+    const fullPath = path.join(rootPhotoDir, objectPath);
+    console.log(`year dir: ${fullPath}`);
+    if (statSync(fullPath).isDirectory()) {
+      const albumDirectoryPaths: string[] = readdirSync(fullPath);
+
+      // iterate over each album directory
+      for (const albumDirPath of albumDirectoryPaths) {
+        const albumDirFullPath = path.join(fullPath, albumDirPath);
+        console.log(`album path: ${albumDirFullPath}`);
+        console.log(`album name: ${albumDirPath}`);
+
+        // create album
+        // const albumId: string = await createAlbum(oAuth2Client, albumDirPath);
+        // console.log(`Created album with ID ${albumId}`);
+
+        // iterate over each photo in the album directory
+        const photoPaths: string[] = readdirSync(albumDirFullPath);
+        for (const photoPath of photoPaths) {
+          const photoFullPath = path.join(albumDirFullPath, photoPath);
+          if (statSync(photoFullPath).isFile()) {
+            console.log(`photo path: ${photoFullPath}`);
+          }
+        }
+      }
+    }
+  }
+}
+
+main().catch(console.error);
