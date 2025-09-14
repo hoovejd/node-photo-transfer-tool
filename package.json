@@ -4,12 +4,14 @@
     "clean": "rm -f token.json"
   },
   "devDependencies": {
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^24.3.0",
     "@types/server-destroy": "^1.0.4",
     "typescript": "^5.9.2"
   },
   "dependencies": {
     "google-auth-library": "^10.3.0",
+    "mime-types": "^3.0.1",
     "open": "^10.2.0",
     "server-destroy": "^1.0.1"
   }

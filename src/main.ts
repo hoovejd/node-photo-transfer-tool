@@ -1,8 +1,9 @@
-import { OAuth2Client, TokenInfo } from "google-auth-library";
-import { getAuthenticatedClient } from "./auth";
-import { fstat, readdirSync, readFileSync, Stats, statSync } from "fs";
-import path from "path";
 import { log } from "console";
+import { readdirSync, readFileSync, statSync } from "fs";
+import { OAuth2Client, TokenInfo } from "google-auth-library";
+import mime from "mime-types";
+import path from "path";
+import { getAuthenticatedClient } from "./auth";
 
 async function main() {
   const oAuth2Client: OAuth2Client = await getAuthenticatedClient();
@@ -18,7 +19,7 @@ async function main() {
 async function displayTokenInfo(oAuth2Client: OAuth2Client) {
   // Check on the audience, expiration, or original scopes requested.
   const tokenInfo: TokenInfo = await oAuth2Client.getTokenInfo(oAuth2Client.credentials.access_token as string);
-  console.log(`Token expires on ${new Date(tokenInfo.expiry_date).toLocaleString()}`);
+  log(`Token expires on ${new Date(tokenInfo.expiry_date).toLocaleString()}`);
 }
 
 // Make a simple request to the People API using our pre-authenticated client.
@@ -40,7 +41,7 @@ function listAlbums(oAuth2Client: OAuth2Client) {
   });
 }
 
-async function uploadImage(oAuth2Client: OAuth2Client) {
+async function uploadImageTest(oAuth2Client: OAuth2Client) {
   const accessToken = oAuth2Client.credentials.access_token;
   const imageBuffer = readFileSync("src/kitty.jpeg");
 
@@ -106,6 +107,31 @@ async function createAlbum(oAuth2Client: OAuth2Client, title: string): Promise<s
   return json.id;
 }
 
+// Uploads an image and returns the upload token
+async function uploadImage(oAuth2Client: OAuth2Client, imagePath: string): Promise<string> {
+  const accessToken = oAuth2Client.credentials.access_token;
+  const imageBuffer = readFileSync(imagePath);
+  const mimeType = mime.lookup(imagePath);
+  log(`MIME type for ${imagePath} is ${mimeType}`);
+  if (!mimeType) {
+    throw new Error(`Could not determine MIME type for file: ${imagePath}`);
+  }
+
+  // Upload the image to get an upload token
+  const uploadResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-type": "application/octet-stream",
+      "X-Goog-Upload-Content-Type": mimeType,
+      "X-Goog-Upload-Protocol": "raw",
+    },
+    body: imageBuffer,
+  });
+
+  return uploadResponse.text();
+}
+
 async function uploadAllPhotos(oAuth2Client: OAuth2Client, rootPhotoDir: string) {
   const rootObjectPaths: string[] = readdirSync(rootPhotoDir);
   for (const objectPath of rootObjectPaths) {
@@ -121,17 +147,51 @@ async function uploadAllPhotos(oAuth2Client: OAuth2Client, rootPhotoDir: string)
         console.log(`album name: ${albumDirPath}`);
 
         // create album
-        // const albumId: string = await createAlbum(oAuth2Client, albumDirPath);
-        // console.log(`Created album with ID ${albumId}`);
+        const albumId: string = await createAlbum(oAuth2Client, albumDirPath);
+        console.log(`Created album with ID ${albumId}`);
 
         // iterate over each photo in the album directory
         const photoPaths: string[] = readdirSync(albumDirFullPath);
+        const photoInfo: { fileName: string; uploadToken: string }[] = [];
         for (const photoPath of photoPaths) {
+          log(`photo path: ${photoPath}`);
           const photoFullPath = path.join(albumDirFullPath, photoPath);
           if (statSync(photoFullPath).isFile()) {
-            console.log(`photo path: ${photoFullPath}`);
+            console.log(`full photo path: ${photoFullPath}`);
+
+            // upload image to get upload token
+            const uploadToken: string = await uploadImage(oAuth2Client, photoFullPath);
+            console.log(`Obtained upload token for ${photoFullPath}`);
+            photoInfo.push({ fileName: photoPath, uploadToken: uploadToken });
+          } else {
+            console.error(`Unexpected directory!: ${photoFullPath}`);
           }
         }
+
+        // prepare body for batch create
+        const body = {
+          albumId: albumId,
+          newMediaItems: photoInfo.map((info) => ({
+            simpleMediaItem: {
+              fileName: info.fileName,
+              uploadToken: info.uploadToken,
+            },
+          })),
+        };
+
+        // batch create media items in the album
+        const accessToken = oAuth2Client.credentials.access_token;
+        const createResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        const createResult = await createResponse.json();
+        console.log("Batch create response:", JSON.stringify(createResult, null, 2));
       }
     }
   }
