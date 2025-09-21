@@ -13,7 +13,8 @@ async function main() {
   //uploadImage(oAuth2Client);
   // const albumId = await createAlbum(oAuth2Client, "Another New Album from API");
   // console.log(`Created album with ID ${albumId}`)
-  uploadAllPhotos(oAuth2Client, "/home/hoovejd/pictures");
+  //uploadAllPhotos(oAuth2Client, "/home/hoovejd/pictures");
+  uploadAllPhotos(oAuth2Client, "/home/hoovejd/test_video");
 }
 
 async function displayTokenInfo(oAuth2Client: OAuth2Client) {
@@ -159,42 +160,69 @@ async function uploadAllPhotos(oAuth2Client: OAuth2Client, rootPhotoDir: string)
           if (statSync(photoFullPath).isFile()) {
             console.log(`full photo path: ${photoFullPath}`);
 
+            if (photoFullPath.includes("Zone.Identifier")) {
+              console.warn(`skipping Zone Identifier: ${photoFullPath}`);
+              continue;
+            }
+
             // upload image to get upload token
             const uploadToken: string = await uploadImage(oAuth2Client, photoFullPath);
             console.log(`Obtained upload token for ${photoFullPath}`);
             photoInfo.push({ fileName: photoPath, uploadToken: uploadToken });
+
+            if (photoInfo.length >= 50) {
+              console.log(`Reached 50 photos, uploading batch to album ${albumId}`);
+
+              // batch create media items in the album
+              await batchCreate(photoInfo, albumId, oAuth2Client);
+
+              // clear photoInfo for next batch
+              photoInfo.length = 0;
+            }
           } else {
             console.error(`Unexpected directory!: ${photoFullPath}`);
           }
         }
 
-        // prepare body for batch create
-        const body = {
-          albumId: albumId,
-          newMediaItems: photoInfo.map((info) => ({
-            simpleMediaItem: {
-              fileName: info.fileName,
-              uploadToken: info.uploadToken,
-            },
-          })),
-        };
-
-        // batch create media items in the album
-        const accessToken = oAuth2Client.credentials.access_token;
-        const createResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-
-        const createResult = await createResponse.json();
-        console.log("Batch create response:", JSON.stringify(createResult, null, 2));
+        // upload any remaining photos in the album
+        if (photoInfo.length > 0) {
+          console.log(`Uploading final batch of ${photoInfo.length} photos to album ${albumId}`);
+          await batchCreate(photoInfo, albumId, oAuth2Client);
+          photoInfo.length = 0;
+        }
       }
     }
   }
+}
+
+async function batchCreate(
+  photoInfo: { fileName: string; uploadToken: string }[],
+  albumId: string,
+  oAuth2Client: OAuth2Client
+) {
+  const body = {
+    albumId: albumId,
+    newMediaItems: photoInfo.map((info) => ({
+      simpleMediaItem: {
+        fileName: info.fileName,
+        uploadToken: info.uploadToken,
+      },
+    })),
+  };
+
+  // batch create media items in the album
+  const accessToken = oAuth2Client.credentials.access_token;
+  const createResponse: Response = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const createResult = await createResponse.json();
+  console.log("Batch create response:", JSON.stringify(createResult, null, 2));
 }
 
 main().catch(console.error);
