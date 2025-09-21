@@ -13,8 +13,8 @@ async function main() {
   //uploadImage(oAuth2Client);
   // const albumId = await createAlbum(oAuth2Client, "Another New Album from API");
   // console.log(`Created album with ID ${albumId}`)
-  //uploadAllPhotos(oAuth2Client, "/home/hoovejd/pictures");
-  uploadAllPhotos(oAuth2Client, "/home/hoovejd/test_video");
+  uploadAllPhotos(oAuth2Client, "/home/hoovejd/pictures");
+  //uploadAllPhotos(oAuth2Client, "/home/hoovejd/test_video");
 }
 
 async function displayTokenInfo(oAuth2Client: OAuth2Client) {

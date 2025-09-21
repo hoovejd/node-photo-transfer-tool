@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "ts-node src/main.ts",
+    "compare": "ts-node src/compare.ts",
     "clean": "rm -f token.json"
   },
   "devDependencies": {
